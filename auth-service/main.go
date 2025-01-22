@@ -15,7 +15,7 @@ type server struct {
 
 func (s *server) AuthenticateUser(ctx context.Context, req *proto.AuthenticateUserRequest) (*proto.AuthenticateUserResponse, error) {
 	// Simple hardcoded authentication for example
-	valid := req.Username == "admin" && req.Password == "password"
+	valid := (req.Username == "admin" || req.Username == "user") && req.Password == "password"
 	return &proto.AuthenticateUserResponse{Success: valid}, nil
 }
 

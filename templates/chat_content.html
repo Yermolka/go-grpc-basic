@@ -1,0 +1,230 @@
+{{ define "chat_content" }}
+<div class="chat-container">
+    <div class="chat-header">
+        <h1>Chat Rooms</h1>
+        <button onclick="showCreateRoomForm()" class="btn-create-room">Create New Room</button>
+    </div>
+
+    <div id="create-room-form" class="create-room-form" style="display: none;">
+        <h2>Create New Room</h2>
+        <div class="form-group">
+            <input type="text" id="room-name" placeholder="Room name" required>
+        </div>
+        <div class="form-group">
+            <input type="password" id="room-password" placeholder="Password (optional)">
+        </div>
+        <div class="form-group">
+            <input type="number" id="room-max" placeholder="Max members" value="10" min="2">
+        </div>
+        <div class="form-actions">
+            <button onclick="createRoom()" class="btn-primary">Create Room</button>
+            <button onclick="hideCreateRoomForm()" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <div class="room-list" id="room-list">
+        <div class="loading-indicator">Loading rooms...</div>
+    </div>
+
+    <div id="chat-area" class="chat-area" style="display: none;">
+        <div class="chat-header">
+            <h2 id="current-room-name"></h2>
+            <button onclick="leaveRoom()" class="btn-leave">Leave Room</button>
+        </div>
+        
+        <div id="chat-messages" class="chat-messages"></div>
+        
+        <div class="message-input">
+            <input type="text" id="message-input" 
+                   placeholder="Type your message..." 
+                   onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()" class="btn-send">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentWebSocket = null;
+    let currentRoomId = null;
+
+    function showCreateRoomForm() {
+        document.getElementById('create-room-form').style.display = 'block';
+    }
+
+    function hideCreateRoomForm() {
+        document.getElementById('create-room-form').style.display = 'none';
+    }
+
+    function createRoom() {
+        const name = document.getElementById('room-name').value;
+        const password = document.getElementById('room-password').value;
+        const maxMembers = document.getElementById('room-max').value;
+
+        fetch('/rooms/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                password: password,
+                max_members: maxMembers
+            })
+        })
+        .then(response => response.json())
+        .then(room => {
+            loadRooms();
+            hideCreateRoomForm();
+            joinRoom(room.id, password);
+        })
+        .catch(error => {
+            console.error('Error creating room:', error);
+        });
+    }
+
+    function loadRooms() {
+        fetch('/rooms')
+            .then(response => response.json())
+            .then(rooms => {
+                const list = document.getElementById('room-list');
+                list.innerHTML = rooms.length ? rooms.map(room => `
+    <div class="room-card" data-room-id="${room.id}" data-has-password="${room.has_password}">
+        <div class="room-info">
+            <h3 class="room-name">${room.name}</h3>
+            <p>Members: ${room.members}/${room.max_members}</p>
+            ${room.has_password ? '<span class="lock-icon">🔒</span>' : ''}
+        </div>
+        <div class="room-actions">
+            <button onclick="joinRoom('${room.id}')" 
+                    class="btn-join" 
+                    ${room.members >= room.max_members ? 'disabled' : ''}>
+                Join
+            </button>
+        </div>
+    </div>
+`).join('') : '<div class="no-rooms">No active rooms found</div>';
+            });
+    }
+
+    function joinRoom(roomId, password = '') {
+        // Check if room exists in DOM
+    const roomElement = document.querySelector(`[data-room-id="${roomId}"]`);
+    if (!roomElement) {
+        alert('Room no longer exists');
+        return;
+    }
+
+    // Get password if required
+    const hasPassword = roomElement.dataset.hasPassword === 'true';
+    if (hasPassword && !password) {
+        password = prompt('Enter room password:');
+        if (!password) return;
+    }
+
+    // Close existing connection
+    if (currentWebSocket) {
+        currentWebSocket.close();
+    }
+
+    // Establish new WebSocket connection
+    currentWebSocket = new WebSocket(`ws://${window.location.host}/ws`);
+    currentRoomId = roomId;
+
+    currentWebSocket.onopen = function() {
+        this.send(JSON.stringify({
+            action: 'join',
+            room_id: roomId,
+            password: password
+        }));
+        
+        // Update UI after successful join
+        document.getElementById('chat-area').style.display = 'block';
+        document.getElementById('current-room-name').textContent = 
+            roomElement.querySelector('.room-name').textContent;
+    };
+
+    currentWebSocket.onmessage = function(event) {
+    try {
+        const msg = JSON.parse(event.data);
+        const chatDiv = document.getElementById('chat-messages');
+        
+        const messageEl = document.createElement('div');
+        messageEl.classList.add('message-container');
+
+        switch(msg.type) {
+            case 'system':
+                messageEl.innerHTML = `
+                    <div class="system-message">
+                        ${msg.content}
+                    </div>`;
+                break;
+
+            case 'chat':
+                chatDiv.innerHTML += `
+                        <div class="chat-message">
+                            <strong>${msg.username}</strong>: ${msg.message}
+                            <small>${new Date(msg.time).toLocaleTimeString()}</small>
+                        </div>`;
+                    break;
+                break;
+        }
+
+        chatDiv.appendChild(messageEl);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+
+    } catch (error) {
+        console.error('Error processing message:', error);
+    }
+};
+
+// Basic HTML escaping for message content
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+        currentWebSocket.onerror = function(error) {
+        console.error('WebSocket error:', error);
+        alert('Connection error. Please try again.');
+    };
+
+    currentWebSocket.onclose = function(event) {
+        if (event.code !== 1000) { // 1000 = normal closure
+            alert('Disconnected from room: ' + event.reason);
+        }
+        document.getElementById('chat-area').style.display = 'none';
+        currentRoomId = null;
+    };
+    }
+
+    function leaveRoom() {
+        if (currentWebSocket) {
+            currentWebSocket.close();
+        }
+    }
+
+    function sendMessage() {
+    const input = document.getElementById('message-input');
+    if (currentWebSocket && input.value.trim()) {
+        const message = {
+            action: 'message',
+            content: input.value.trim()
+        };
+        currentWebSocket.send(JSON.stringify(message));
+        input.value = '';
+    }
+}
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    // Initial load
+    loadRooms();
+    setInterval(loadRooms, 10000); // Refresh room list every 10 seconds
+</script>
+{{ end }}
