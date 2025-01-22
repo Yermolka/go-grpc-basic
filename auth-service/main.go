@@ -13,6 +13,12 @@ type server struct {
 	proto.UnimplementedAuthServiceServer
 }
 
+func (s *server) AuthenticateUser(ctx context.Context, req *proto.AuthenticateUserRequest) (*proto.AuthenticateUserResponse, error) {
+	// Simple hardcoded authentication for example
+	valid := req.Username == "admin" && req.Password == "password"
+	return &proto.AuthenticateUserResponse{Success: valid}, nil
+}
+
 func (s *server) ValidateToken(ctx context.Context, req *proto.ValidateTokenRequest) (*proto.ValidateTokenResponse, error) {
 	return &proto.ValidateTokenResponse{Valid: req.Token == "valid-token"}, nil
 }

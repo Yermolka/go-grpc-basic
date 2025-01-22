@@ -1,11 +1,21 @@
 syntax = "proto3";
 
-option go_package = "grpc-example/proto";
+option go_package = "go-grpc-basic/proto";
 
 package proto;
 
 service AuthService {
+  rpc AuthenticateUser (AuthenticateUserRequest) returns (AuthenticateUserResponse) {}
   rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse) {}
+}
+
+message AuthenticateUserRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthenticateUserResponse {
+  bool success = 1;
 }
 
 message ValidateTokenRequest {
