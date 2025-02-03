@@ -11,7 +11,7 @@ var templates *template.Template
 
 func initTemplates() {
 	templates = template.Must(template.New("").
-		ParseGlob("../templates/*.html"))
+		ParseGlob("templates/*.html"))
 }
 
 func renderTemplate(w http.ResponseWriter, name string, data PageData) {

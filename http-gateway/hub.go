@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"go-grpc-basic/proto/presence"
 	"log"
 	"net/http"
 	"time"
@@ -141,10 +143,11 @@ func listRoomsHandler(hub *Hub) http.HandlerFunc {
 	})
 }
 
-func websocketHandler(hub *Hub) http.HandlerFunc {
+func websocketHandler(hub *Hub, presenceClient presence.PresenceServiceClient) http.HandlerFunc {
 	return authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		session, _ := store.Get(r, "session-name")
 		username := session.Values["username"].(string)
+		userID := session.Values["userID"].(string)
 
 		conn, err := websocket.Upgrade(w, r, nil, 1024, 1024)
 		if err != nil {
@@ -198,6 +201,28 @@ func websocketHandler(hub *Hub) http.HandlerFunc {
 
 		go client.writePump()
 		go client.readPump(hub)
+
+		sessionID := uuid.New().String()
+		_, err = presenceClient.UpdatePresence(r.Context(), &presence.UpdatePresenceRequest{
+			UserId:    userID,
+			Online:    true,
+			SessionId: sessionID,
+		})
+		if err != nil {
+			log.Printf("Error updating presence: %v", err)
+		}
+
+		client.conn.SetCloseHandler(func(code int, text string) error {
+			_, err := presenceClient.UpdatePresence(context.Background(), &presence.UpdatePresenceRequest{
+				UserId:    userID,
+				Online:    false,
+				SessionId: sessionID,
+			})
+			if err != nil {
+				log.Printf("Error closing presence: %v", err)
+			}
+			return nil
+		})
 	})
 }
 

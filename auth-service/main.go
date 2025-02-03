@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"go-grpc-basic/proto"
+	proto "go-grpc-basic/proto"
 	"log"
 	"net"
 

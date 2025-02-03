@@ -1,0 +1,31 @@
+services:
+  auth:
+    ports:
+      - "50051:50051"
+    build: 
+      context: .
+      dockerfile: auth-service/Dockerfile
+  presence:
+    ports:
+      - "50052:50052"
+    build:
+      context: .
+      dockerfile: presence-service/Dockerfile
+  gateway:
+    build: 
+      context: .
+      dockerfile: http-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      AUTH_HOST: auth
+      AUTH_PORT: 50051
+      PRESENCE_HOST: presence
+      PRESENCE_PORT: 50052
+
+  lgtm:
+    image: grafana/otel-lgtm
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"

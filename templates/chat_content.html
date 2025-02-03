@@ -223,6 +223,26 @@ function escapeHtml(unsafe) {
         }
     }
 
+    function updatePresenceIndicator(userId, isOnline) {
+        const indicator = document.querySelector(`[data-user="${userId}"] .presence`);
+        if (indicator) {
+            indicator.className = `presence ${isOnline ? 'online' : 'offline'}`;
+            indicator.title = isOnline ? 'Online' : `Last seen TO BE IMPLEMENTED`;
+        }
+    }
+
+    // Periodically check presence
+    setInterval(() => {
+        const userIds = Array.from(document.querySelectorAll('[data-user]'))
+            .map(el => el.dataset.user);
+        
+        fetch(`/api/presence?user_ids=${userIds.join(',')}`)
+            .then(res => res.json())
+            .then(presences => {
+                presences.forEach(p => updatePresenceIndicator(p.user_id, p.online));
+            });
+    }, 10000);
+
     // Initial load
     loadRooms();
     setInterval(loadRooms, 10000); // Refresh room list every 10 seconds

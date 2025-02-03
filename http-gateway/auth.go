@@ -1,7 +1,7 @@
 package main
 
 import (
-	"go-grpc-basic/proto"
+	proto "go-grpc-basic/proto"
 	"net/http"
 )
 
@@ -27,6 +27,7 @@ func loginHandler(client proto.AuthServiceClient) http.HandlerFunc {
 		session, _ := store.Get(r, "session-name")
 		session.Values["authenticated"] = true
 		session.Values["username"] = username
+		session.Values["userID"] = "1"
 		session.Save(r, w)
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 	}
