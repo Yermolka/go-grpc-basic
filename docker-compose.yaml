@@ -5,12 +5,14 @@ services:
     build: 
       context: .
       dockerfile: auth-service/Dockerfile
+
   presence:
     ports:
       - "50052:50052"
     build:
       context: .
       dockerfile: presence-service/Dockerfile
+      
   gateway:
     build: 
       context: .
